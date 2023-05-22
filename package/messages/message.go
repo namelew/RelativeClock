@@ -12,7 +12,7 @@ const (
 	ERROR Action = 0
 	ADD   Action = 1
 	SUB   Action = 2
-	REP   Action = 3
+	ACK   Action = 3
 )
 
 type Message struct {
@@ -20,6 +20,7 @@ type Message struct {
 	Action         Action
 	Timestep       uint64
 	SenderTimestep uint64
+	Payload        int64
 }
 
 func (m *Message) Pack() ([]byte, error) {
@@ -30,7 +31,7 @@ func (m *Message) Unpack(b []byte) error {
 	return json.Unmarshal(b, m)
 }
 
-func (m *Message) GetTime() uint64 {
+func (m *Message) Value() uint64 {
 	if m.SenderTimestep > m.Timestep {
 		return m.SenderTimestep
 	}
