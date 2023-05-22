@@ -16,9 +16,10 @@ const (
 )
 
 type Message struct {
-	Id       uint64
-	Action   Action
-	Timestep uint64
+	Id             uint64
+	Action         Action
+	Timestep       uint64
+	SenderTimestep uint64
 }
 
 func (m *Message) Pack() ([]byte, error) {
@@ -27,6 +28,13 @@ func (m *Message) Pack() ([]byte, error) {
 
 func (m *Message) Unpack(b []byte) error {
 	return json.Unmarshal(b, m)
+}
+
+func (m *Message) GetTime() uint64 {
+	if m.SenderTimestep > m.Timestep {
+		return m.SenderTimestep
+	}
+	return m.Timestep
 }
 
 func (m *Message) Send(c net.Conn) error {
