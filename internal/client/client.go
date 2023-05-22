@@ -30,7 +30,7 @@ func New(id uint64) *Teller {
 func (t *Teller) Run() {
 	r := bufio.NewReader(os.Stdin)
 
-	fmt.Printf("Action\n1 - Add\n2 - Sub")
+	fmt.Printf("Action\n1 - Add\n2 - Sub\n")
 	fmt.Println("Expect: Action Value")
 
 	for {
@@ -42,7 +42,10 @@ func (t *Teller) Run() {
 			continue
 		}
 
-		input := strings.Split(string(p), " ")
+		temp := strings.ReplaceAll(string(p), "\r", "")
+		temp = strings.ReplaceAll(temp, "\n", "")
+
+		input := strings.Split(temp, " ")
 
 		if len(input) < 2 {
 			log.Println("Menos argumentos do que necessário")
@@ -56,11 +59,19 @@ func (t *Teller) Run() {
 			continue
 		}
 
+		payload, err := strconv.Atoi(input[1])
+
+		if err != nil {
+			log.Println("Formato inválido! ", err.Error())
+			continue
+		}
+
 		m := messages.Message{
 			Id:             t.id,
 			Action:         messages.Action(action),
 			Timestep:       t.currentTime,
 			SenderTimestep: t.currentTime,
+			Payload:        int64(payload),
 		}
 
 		conn, err := net.Dial("tcp", t.server)

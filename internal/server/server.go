@@ -11,7 +11,7 @@ import (
 	"github.com/namelew/RelativeClock/package/minheap"
 )
 
-const SYNCTIMER time.Duration = time.Second * 3
+const SYNCTIMER time.Duration = time.Second * 10
 
 type Bank struct {
 	currentTime uint64
@@ -36,7 +36,7 @@ func (b *Bank) sync() {
 
 			d, err := b.timeline.ExtractMin()
 
-			for err != nil {
+			for err == nil {
 				m, ok := d.(*messages.Message)
 
 				if !ok {
@@ -46,17 +46,17 @@ func (b *Bank) sync() {
 
 				switch m.Action {
 				case messages.ADD:
-					log.Printf("Running request from %d, adding %d into balance\n", m.Id, m.Payload)
+					log.Printf("Running request from %d into time %d, adding %d into balance\n", m.Id, m.Value(), m.Payload)
 					b.value += m.Payload
 				case messages.SUB:
-					log.Printf("Running request from %d, decressing %d into balance\n", m.Id, m.Payload)
+					log.Printf("Running request from %d into time %d, decressing %d into balance\n", m.Id, m.Value(), m.Payload)
 					b.value -= m.Payload
 				}
 
 				d, err = b.timeline.ExtractMin()
 			}
 
-			log.Println("Finishing syncronization. Current value: ", b.value)
+			log.Println("Finishing syncronization. Current balance: ", b.value)
 		}
 	} else {
 		for {
@@ -64,7 +64,7 @@ func (b *Bank) sync() {
 
 			d, err := b.timeline.ExtractMin()
 
-			for err != nil {
+			for err == nil {
 				m, ok := d.(*messages.Message)
 
 				if !ok {
