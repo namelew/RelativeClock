@@ -2,18 +2,20 @@ package minheap
 
 import (
 	"errors"
+
+	"golang.org/x/exp/constraints"
 )
 
-type Ordened[T ~int] interface {
+type Ordened[T constraints.Integer] interface {
 	Value() T
 }
 
-type MinHeap[K ~int] struct {
+type MinHeap[K constraints.Integer] struct {
 	data []Ordened[K]
 	size int
 }
 
-func New[K ~int]() *MinHeap[K] {
+func New[K constraints.Integer]() *MinHeap[K] {
 	return &MinHeap[K]{
 		data: make([]Ordened[K], 0),
 		size: 0,

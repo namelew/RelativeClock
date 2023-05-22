@@ -7,17 +7,20 @@ import (
 	"os"
 
 	"github.com/namelew/RelativeClock/package/messages"
+	"github.com/namelew/RelativeClock/package/minheap"
 )
 
 type Bank struct {
 	currentTime uint64
 	auxServer   bool
+	timeline    *minheap.MinHeap[uint64]
 }
 
 func New() *Bank {
 	return &Bank{
 		currentTime: 0,
 		auxServer:   false,
+		timeline:    minheap.New[uint64](),
 	}
 }
 
