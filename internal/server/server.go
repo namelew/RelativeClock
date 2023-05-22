@@ -125,8 +125,6 @@ func (b *Bank) Run() {
 
 			n, err := bufio.NewReader(c).Read(buffer)
 
-			defer c.Close()
-
 			if err != nil {
 				log.Println("Unable to read data from "+c.RemoteAddr().String()+". ", err.Error())
 				return
@@ -138,6 +136,12 @@ func (b *Bank) Run() {
 			}
 
 			b.timeline.Insert(&in)
+
+			if b.currentTime >= in.Value() {
+				b.currentTime++
+			} else {
+				b.currentTime += in.Value() + 1
+			}
 
 			out = messages.Message{
 				Id:             0,

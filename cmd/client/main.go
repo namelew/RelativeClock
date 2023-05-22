@@ -8,7 +8,7 @@ import (
 func main() {
 	godotenv.Load()
 
-	pd := client.New()
+	pd := client.New(10)
 
 	pd.Run()
 }
