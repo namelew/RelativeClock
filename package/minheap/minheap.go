@@ -2,6 +2,7 @@ package minheap
 
 import (
 	"errors"
+	"sync"
 
 	"golang.org/x/exp/constraints"
 )
@@ -13,16 +14,21 @@ type Ordened[T constraints.Integer] interface {
 type MinHeap[K constraints.Integer] struct {
 	data []Ordened[K]
 	size int
+	lock sync.Mutex
 }
 
 func New[K constraints.Integer]() *MinHeap[K] {
 	return &MinHeap[K]{
 		data: make([]Ordened[K], 0),
 		size: 0,
+		lock: sync.Mutex{},
 	}
 }
 
 func (h *MinHeap[K]) Insert(x Ordened[K]) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
 	h.data = append(h.data, x)
 	h.size++
 	h.bubbleUp(h.size - 1)
@@ -40,6 +46,9 @@ func (h *MinHeap[K]) bubbleUp(i int) {
 }
 
 func (h *MinHeap[K]) ExtractMin() (Ordened[K], error) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
 	if h.IsEmpty() {
 		return nil, errors.New("heap is empty")
 	}
@@ -70,6 +79,9 @@ func (h *MinHeap[K]) bubbleDown(i int) {
 }
 
 func (h *MinHeap[K]) Peek() (Ordened[K], error) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
 	if h.IsEmpty() {
 		return nil, errors.New("heap is empty")
 	}
