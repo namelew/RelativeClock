@@ -1,6 +1,10 @@
 package messages
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"errors"
+	"net"
+)
 
 type Action uint32
 
@@ -23,4 +27,20 @@ func (m *Message) Pack() ([]byte, error) {
 
 func (m *Message) Unpack(b []byte) error {
 	return json.Unmarshal(b, m)
+}
+
+func (m *Message) Send(c net.Conn) error {
+	payload, err := m.Pack()
+
+	if err != nil {
+		return errors.New("Unable to pack message. " + err.Error())
+	}
+
+	_, err = c.Write(payload)
+
+	if err != nil {
+		return errors.New("Unable to send message to " + c.RemoteAddr().String() + ". " + err.Error())
+	}
+
+	return err
 }
