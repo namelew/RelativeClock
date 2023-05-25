@@ -46,10 +46,10 @@ func (b *Bank) sync() {
 
 				switch m.Action {
 				case messages.ADD:
-					log.Printf("Running request from %d into time %d, adding %d into balance\n", m.Id, m.Value(), m.Payload)
+					log.Printf("Running request from %d into time %d, adding %d into balance\n", m.Id, m.Value()-m.Id, m.Payload)
 					b.value += m.Payload
 				case messages.SUB:
-					log.Printf("Running request from %d into time %d, decressing %d into balance\n", m.Id, m.Value(), m.Payload)
+					log.Printf("Running request from %d into time %d, decressing %d into balance\n", m.Id, m.Value()-m.Id, m.Payload)
 					b.value -= m.Payload
 				}
 
