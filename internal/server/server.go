@@ -140,7 +140,7 @@ func (b *Bank) Run() {
 			if b.currentTime >= in.Value() {
 				b.currentTime++
 			} else {
-				b.currentTime += in.Value() + 1
+				b.currentTime += in.Value() - in.Id + 1
 			}
 
 			out = messages.Message{
