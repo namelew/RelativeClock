@@ -13,6 +13,7 @@ const (
 	DEP   Action = 1
 	FEE   Action = 2
 	ACK   Action = 3
+	GTM   Action = 4
 )
 
 type Message struct {
