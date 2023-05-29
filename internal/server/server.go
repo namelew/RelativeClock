@@ -49,8 +49,8 @@ func (b *Bank) sync() {
 					log.Printf("Running request from %d into time %d, adding %d into balance\n", m.Id, m.Value()-m.Id, m.Payload)
 					b.value += m.Payload
 				case messages.JUR:
-					log.Printf("Running request from %d into time %d, decressing %d into balance\n", m.Id, m.Value()-m.Id, m.Payload)
-					b.value -= m.Payload
+					log.Printf("Running request from %d into time %d, applying fees %d %% into the balance\n", m.Id, m.Value()-m.Id, m.Payload*100)
+					b.value *= m.Payload
 				}
 
 				d, err = b.timeline.ExtractMin()
