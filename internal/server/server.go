@@ -33,7 +33,7 @@ func (b *Bank) updateTime(m *messages.Message) {
 	if b.currentTime >= m.Value() {
 		b.currentTime++
 	} else {
-		b.currentTime += m.Value() - m.Id + 1
+		b.currentTime = m.Value() - m.Id + 1
 	}
 }
 
@@ -217,7 +217,7 @@ func (b *Bank) Run() {
 				}
 
 				newTime := response.Value() - response.Id
-				
+
 				if b.currentTime != newTime {
 					b.currentTime = newTime
 					log.Println("System current time", b.currentTime)

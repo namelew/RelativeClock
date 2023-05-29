@@ -22,7 +22,7 @@ type Teller struct {
 func New(id uint64) *Teller {
 	return &Teller{
 		id:          id,
-		currentTime: 0,
+		currentTime: 1,
 		server:      os.Getenv("SERVER"),
 	}
 }
@@ -112,6 +112,6 @@ func (t *Teller) Run() {
 			continue
 		}
 
-		t.currentTime += m.Value() - m.Id + 1
+		t.currentTime = m.Value() - m.Id
 	}
 }
