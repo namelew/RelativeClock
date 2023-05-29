@@ -13,14 +13,12 @@ const (
 	DEP   Action = 1
 	FEE   Action = 2
 	ACK   Action = 3
-	STM   Action = 4
 )
 
 type Message struct {
 	Id             uint64
 	Action         Action
 	Timestep       uint64
-	SenderTimestep uint64
 	Payload        int64
 }
 
@@ -33,9 +31,6 @@ func (m *Message) Unpack(b []byte) error {
 }
 
 func (m *Message) Value() uint64 {
-	if m.SenderTimestep > m.Timestep {
-		return m.SenderTimestep + m.Id
-	}
 	return m.Timestep + m.Id
 }
 
