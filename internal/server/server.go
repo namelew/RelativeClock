@@ -22,7 +22,7 @@ type Bank struct {
 
 func New() *Bank {
 	return &Bank{
-		currentTime: 0,
+		currentTime: 1,
 		auxServer:   false,
 		timeline:    minheap.New[uint64](),
 		value:       0,
@@ -45,10 +45,10 @@ func (b *Bank) sync() {
 				}
 
 				switch m.Action {
-				case messages.ADD:
+				case messages.DEP:
 					log.Printf("Running request from %d into time %d, adding %d into balance\n", m.Id, m.Value()-m.Id, m.Payload)
 					b.value += m.Payload
-				case messages.SUB:
+				case messages.JUR:
 					log.Printf("Running request from %d into time %d, decressing %d into balance\n", m.Id, m.Value()-m.Id, m.Payload)
 					b.value -= m.Payload
 				}

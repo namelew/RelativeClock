@@ -10,8 +10,8 @@ type Action uint32
 
 const (
 	ERROR Action = 0
-	ADD   Action = 1
-	SUB   Action = 2
+	DEP   Action = 1
+	JUR   Action = 2
 	ACK   Action = 3
 )
 
