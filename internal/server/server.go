@@ -83,20 +83,47 @@ func (b *Bank) handlerResquet(c net.Conn) {
 		return
 	}
 
-	if in.Action != messages.GTM {
+	switch in.Action {
+	case messages.STM:
+		if b.auxServer {
+			b.currentTime = in.Timestep
+		}
+	default:
 		b.timeline.Insert(&in)
 		b.updateTime(&in)
-	}
 
-	out = messages.Message{
-		Id:             0,
-		Action:         messages.ACK,
-		Timestep:       b.currentTime,
-		SenderTimestep: b.currentTime,
-	}
+		out = messages.Message{
+			Id:             0,
+			Action:         messages.ACK,
+			Timestep:       b.currentTime,
+			SenderTimestep: b.currentTime,
+		}
 
-	if err := out.Send(c); err != nil {
-		log.Println(err.Error())
+		if err := out.Send(c); err != nil {
+			log.Println("Unable to send response", err.Error())
+		}
+
+		go func() {
+			conn, err := net.Dial("tcp", os.Getenv("SERVERAUX"))
+
+			if err != nil {
+				log.Println("Unable to create connection with proxy! ", err.Error())
+				return
+			}
+
+			defer conn.Close()
+
+			m := messages.Message{
+				Action: messages.STM,
+				Timestep: b.currentTime,
+				SenderTimestep: b.currentTime,
+			}
+
+			if err := m.Send(conn); err != nil {
+				log.Println("Unable to send timestep to proxy! ", err.Error())
+				return
+			}
+		}()
 	}
 }
 
@@ -108,7 +135,6 @@ func (b *Bank) report() {
 		return
 	}
 
-	buffer := make([]byte, 1024)
 	m, ok := d.(*messages.Message)
 
 	if !ok {
@@ -131,30 +157,6 @@ func (b *Bank) report() {
 		log.Println("Unable to send timeline to main server. ", er.Error())
 		return
 	}
-
-	time.Sleep(time.Second / 4)
-
-	n, er := conn.Read(buffer)
-
-	if er != nil {
-		b.timeline.Insert(d)
-		log.Println("Unable to read response from main server. ", er.Error())
-		return
-	}
-
-	response := messages.Message{}
-
-	if er := response.Unpack(buffer[:n]); er != nil {
-		b.timeline.Insert(d)
-		log.Println("Unable to read response from main server. ", er.Error())
-		return
-	}
-
-	mainTime := response.Value() - response.Id
-
-	if mainTime != b.currentTime {
-		b.currentTime = mainTime
-	}
 }
 
 func (b *Bank) Run() {
@@ -173,58 +175,8 @@ func (b *Bank) Run() {
 
 	if !b.auxServer {
 		go b.sync()
-	} else {
-		go func() {
-			conn, er := net.Dial("tcp", os.Getenv("SERVER"))
-
-			if er != nil {
-				log.Println("Unable to create connection with main server. ", er.Error())
-				return
-			}
-
-			defer conn.Close()
-
-			for {
-				time.Sleep(time.Second)
-				buffer := make([]byte, 1024)
-
-				m := messages.Message{
-					Id:             0,
-					Action:         messages.GTM,
-					Timestep:       0,
-					SenderTimestep: 0,
-				}
-
-				if er := m.Send(conn); er != nil {
-					log.Println("Unable to request timestep from main server. ", er.Error())
-					continue
-				}
-
-				time.Sleep(time.Second / 4)
-
-				n, er := conn.Read(buffer)
-
-				if er != nil {
-					log.Println("Unable to read response from main server. ", er.Error())
-					continue
-				}
-
-				response := messages.Message{}
-
-				if er := response.Unpack(buffer[:n]); er != nil {
-					log.Println("Unable to read response from main server. ", er.Error())
-					continue
-				}
-
-				newTime := response.Value() - response.Id
-
-				if b.currentTime != newTime {
-					b.currentTime = newTime
-					log.Println("System current time", b.currentTime)
-				}
-			}
-		}()
 	}
+
 	for {
 		conn, err := l.Accept()
 
