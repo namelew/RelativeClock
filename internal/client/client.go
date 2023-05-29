@@ -112,6 +112,6 @@ func (t *Teller) Run() {
 			continue
 		}
 
-		t.currentTime += m.Value() + 1
+		t.currentTime += m.Value() - m.Id + 1
 	}
 }

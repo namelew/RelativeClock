@@ -11,7 +11,7 @@ import (
 	"github.com/namelew/RelativeClock/package/minheap"
 )
 
-const SYNCTIMER time.Duration = time.Second * 10
+const SYNCTIMER time.Duration = time.Second * 30
 
 type Bank struct {
 	currentTime uint64
@@ -26,6 +26,14 @@ func New() *Bank {
 		auxServer:   false,
 		timeline:    minheap.New[uint64](),
 		value:       0,
+	}
+}
+
+func (b *Bank) updateTime(m *messages.Message) {
+	if b.currentTime >= m.Value() {
+		b.currentTime++
+	} else {
+		b.currentTime += m.Value() - m.Id + 1
 	}
 }
 
@@ -48,9 +56,9 @@ func (b *Bank) sync() {
 				case messages.DEP:
 					log.Printf("Running request from %d into time %d, adding %d into balance\n", m.Id, m.Value()-m.Id, m.Payload)
 					b.value += m.Payload
-				case messages.JUR:
-					log.Printf("Running request from %d into time %d, applying fees %d %% into the balance\n", m.Id, m.Value()-m.Id, m.Payload*100)
-					b.value *= m.Payload
+				case messages.FEE:
+					log.Printf("Running request from %d into time %d, decressing %d into the balance\n", m.Id, m.Value()-m.Id, m.Payload)
+					b.value -= m.Payload
 				}
 
 				d, err = b.timeline.ExtractMin()
@@ -65,6 +73,7 @@ func (b *Bank) sync() {
 			d, err := b.timeline.ExtractMin()
 
 			for err == nil {
+				buffer := make([]byte, 1024)
 				m, ok := d.(*messages.Message)
 
 				if !ok {
@@ -75,19 +84,39 @@ func (b *Bank) sync() {
 				conn, er := net.Dial("tcp", os.Getenv("SERVER"))
 
 				if er != nil {
-					b.timeline.Insert(m)
+					b.timeline.Insert(d)
 					log.Println("Unable to read create connection with main server. ", er.Error())
 					continue
 				}
 
 				if er := m.Send(conn); er != nil {
-					b.timeline.Insert(m)
+					b.timeline.Insert(d)
 					log.Println("Unable to send timeline to main server. ", er.Error())
 					conn.Close()
 					continue
 				}
 
+				time.Sleep(time.Second / 4)
+
+				n, er := conn.Read(buffer)
+
 				conn.Close()
+
+				if er != nil {
+					b.timeline.Insert(d)
+					log.Println("Unable to read response from main server. ", er.Error())
+					continue
+				}
+
+				response := messages.Message{}
+
+				if er := response.Unpack(buffer[:n]); er != nil {
+					b.timeline.Insert(d)
+					log.Println("Unable to read response from main server. ", er.Error())
+					continue
+				}
+
+				b.currentTime = response.SenderTimestep
 
 				d, err = b.timeline.ExtractMin()
 			}
@@ -112,6 +141,14 @@ func (b *Bank) Run() {
 	go b.sync()
 
 	for {
+		if b.auxServer {
+			go func() {
+				for {
+					time.Sleep(time.Second)
+					log.Println("System current time", b.currentTime)
+				}
+			}()
+		}
 		conn, err := l.Accept()
 
 		if err != nil {
@@ -137,11 +174,7 @@ func (b *Bank) Run() {
 
 			b.timeline.Insert(&in)
 
-			if b.currentTime >= in.Value() {
-				b.currentTime++
-			} else {
-				b.currentTime += in.Value() - in.Id + 1
-			}
+			b.updateTime(&in)
 
 			out = messages.Message{
 				Id:             0,

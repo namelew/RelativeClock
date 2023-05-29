@@ -11,7 +11,7 @@ type Action uint32
 const (
 	ERROR Action = 0
 	DEP   Action = 1
-	JUR   Action = 2
+	FEE   Action = 2
 	ACK   Action = 3
 )
 
