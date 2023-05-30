@@ -30,7 +30,7 @@ func New(id uint64) *Teller {
 func (t *Teller) Run() {
 	r := bufio.NewReader(os.Stdin)
 
-	fmt.Printf("Action\n1 - Add\n2 - Sub\n")
+	fmt.Printf("Action\n1 - Deposito\n2 - Juros\n")
 	fmt.Println("Expect: Action Value")
 
 	for {
@@ -59,7 +59,7 @@ func (t *Teller) Run() {
 			continue
 		}
 
-		payload, err := strconv.Atoi(input[1])
+		payload, err := strconv.ParseFloat(input[1], 64)
 
 		if err != nil {
 			log.Println("Formato inválido! ", err.Error())
@@ -70,10 +70,18 @@ func (t *Teller) Run() {
 			Id:       t.id,
 			Action:   messages.Action(action),
 			Timestep: t.currentTime,
-			Payload:  float64(payload),
+			Payload:  payload,
 		}
 
-		conn, err := net.Dial("tcp", t.server)
+		var server string
+		switch m.Action {
+		case messages.DEP:
+			server = os.Getenv("WAREROUSE")
+		case messages.FEE:
+			server = os.Getenv("FEES")
+		}
+
+		conn, err := net.Dial("tcp", server)
 
 		if err != nil {
 			log.Println("Incapaz de estabelecer conexão com o servidor! ", err.Error())
@@ -107,10 +115,10 @@ func (t *Teller) Run() {
 		conn.Close()
 
 		if m.Action != messages.ACK {
-			log.Println("Server side error!")
+			log.Println("Violação na sequência temporal!")
 			continue
 		}
 
-		t.currentTime = m.Value() - m.Id
+		t.currentTime++
 	}
 }

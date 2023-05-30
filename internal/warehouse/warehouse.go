@@ -1,4 +1,4 @@
-package server
+package warehouse
 
 import (
 	"bufio"
@@ -42,6 +42,7 @@ func (w *Warehouse) handlerResquet(c net.Conn) {
 	}
 
 	if in.Timestep > w.currentTime {
+		log.Printf("Denying request from %d in time %d\n", in.Id, in.Timestep)
 		out = messages.Message{
 			Id:       0,
 			Action:   messages.ERROR,
@@ -49,6 +50,8 @@ func (w *Warehouse) handlerResquet(c net.Conn) {
 		}
 	} else {
 		w.lock.Lock()
+
+		log.Printf("Receive request from %d in time %d\n", in.Id, in.Timestep)
 
 		w.currentTime++
 
