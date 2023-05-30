@@ -16,10 +16,10 @@ const (
 )
 
 type Message struct {
-	Id             uint64
-	Action         Action
-	Timestep       uint64
-	Payload        int64
+	Id       uint64
+	Action   Action
+	Timestep uint64
+	Payload  float64
 }
 
 func (m *Message) Pack() ([]byte, error) {
