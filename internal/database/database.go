@@ -37,7 +37,7 @@ func (d *Database) worker() {
 		d.lock.Lock()
 		data, err := d.pipeline.ExtractMin()
 
-		for err != nil {
+		for err == nil {
 			m, ok := data.(*messages.Message)
 
 			if !ok {
