@@ -67,11 +67,10 @@ func (t *Teller) Run() {
 		}
 
 		m := messages.Message{
-			Id:             t.id,
-			Action:         messages.Action(action),
-			Timestep:       t.currentTime,
-			SenderTimestep: t.currentTime,
-			Payload:        int64(payload),
+			Id:       t.id,
+			Action:   messages.Action(action),
+			Timestep: t.currentTime,
+			Payload:  float64(payload),
 		}
 
 		conn, err := net.Dial("tcp", t.server)
