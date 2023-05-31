@@ -91,18 +91,7 @@ func (c *Client) readScript() {
 	}
 }
 
-func New(id uint64) *Client {
-	return &Client{
-		id:          id,
-		currentTime: 1,
-		pipeline:    &minheap.MinHeap[uint64]{},
-	}
-}
-
-func (c *Client) Run() {
-	c.getNeighbors()
-	c.readScript()
-
+func (c *Client) handler() {
 	l, err := net.Listen("tcp", c.neighborhood[c.id-1])
 
 	if err != nil {
@@ -142,4 +131,19 @@ func (c *Client) Run() {
 			}
 		}(conn)
 	}
+}
+
+func New(id uint64) *Client {
+	return &Client{
+		id:          id,
+		currentTime: 1,
+		pipeline:    &minheap.MinHeap[uint64]{},
+	}
+}
+
+func (c *Client) Run() {
+	c.getNeighbors()
+	c.readScript()
+
+	c.handler()
 }
