@@ -100,7 +100,7 @@ func (c *Client) runPipeline() {
 
 		if err != nil {
 			log.Println("Finishing pipeline! Balance:", c.value)
-			os.Exit(0)
+			return
 		}
 
 		m := w.(*messages.Message)
@@ -193,7 +193,7 @@ func (c *Client) handler() {
 			c.lock.Lock()
 			defer c.lock.Unlock()
 
-			if request.Timestep <= c.currentTime {
+			if (request.Id == c.id && request.Timestep <= c.currentTime) || (request.Id != c.id && request.Value() <= c.currentTime){
 				log.Println("Acknowledge message from", request.Id, "in time", request.Timestep)
 				response := messages.Message{
 					Id:       c.id,

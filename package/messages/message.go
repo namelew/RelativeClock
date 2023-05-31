@@ -31,7 +31,7 @@ func (m *Message) Unpack(b []byte) error {
 }
 
 func (m *Message) Value() uint64 {
-	return m.Timestep
+	return m.Timestep + m.Id
 }
 
 func (m *Message) Send(c net.Conn) error {
