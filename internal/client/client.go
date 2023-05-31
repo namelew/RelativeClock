@@ -55,7 +55,7 @@ func (c *Client) readScript() {
 	}
 
 	lines := strings.Split(string(data), "\n")
-	re := regexp.MustCompile(`(^\d+) (\w) (\d+)$`)
+	re := regexp.MustCompile(`(^\d+) (\w) (\d+)`)
 
 	for i := range lines {
 		line := removeBackslashChars(lines[i])
@@ -120,10 +120,9 @@ func (c *Client) runPipeline() {
 					return
 				}
 
-				defer conn.Close()
-
 				if err := m.Send(conn); err != nil {
 					log.Println("Unable to send message!", err.Error())
+					conn.Close()
 					return
 				}
 
@@ -136,14 +135,15 @@ func (c *Client) runPipeline() {
 					return
 				}
 
-				if response.Action == messages.ACK {
-					acksLock.Lock()
-					acks++
-					acksLock.Unlock()
-				}
+				acksLock.Lock()
+				acks++
+				acksLock.Unlock()
+
+				conn.Close()
 			}(neighbor)
 		}
 
+		log.Println("Wait neighbors responses. Current time:", c.currentTime)
 		waitGroup.Wait()
 
 		if acks == len(c.neighborhood) {
@@ -160,6 +160,7 @@ func (c *Client) runPipeline() {
 			}
 			c.lock.Unlock()
 		} else {
+			log.Println("Time violation! Delaying message")
 			c.pipeline.Insert(w)
 		}
 
@@ -168,7 +169,7 @@ func (c *Client) runPipeline() {
 }
 
 func (c *Client) handler() {
-	l, err := net.Listen("tcp", c.neighborhood[c.id-1])
+	l, err := net.Listen("tcp", c.neighborhood[c.id])
 
 	if err != nil {
 		log.Fatal("Unable to bind port!", err.Error())
@@ -194,6 +195,7 @@ func (c *Client) handler() {
 			defer c.lock.Unlock()
 
 			if request.Value() <= c.currentTime {
+				log.Println("Acknowledge message from", request.Id)
 				response := messages.Message{
 					Id:       c.id,
 					Action:   messages.ACK,
@@ -201,9 +203,12 @@ func (c *Client) handler() {
 				}
 
 				if err := response.Send(connection); err != nil {
+					connection.Close()
 					log.Println("Unable to send response!", err.Error())
 					return
 				}
+			} else {
+				connection.Close()
 			}
 		}(conn)
 	}
