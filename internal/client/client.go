@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/namelew/RelativeClock/package/messages"
 	"github.com/namelew/RelativeClock/package/minheap"
@@ -17,11 +18,13 @@ type Client struct {
 	id           uint64
 	currentTime  uint64
 	pipeline     *minheap.MinHeap[uint64]
+	value        float64
 	neighborhood []string
 	lock         sync.Mutex
 }
 
 const script string = "./script.in"
+const waitTime time.Duration = time.Second * 3
 
 func removeBackslashChars(s string) string {
 	var result strings.Builder
@@ -91,6 +94,79 @@ func (c *Client) readScript() {
 	}
 }
 
+func (c *Client) runPipeline() {
+	for {
+		w, err := c.pipeline.ExtractMin()
+
+		if err != nil {
+			log.Println("Finishing pipeline! Balance:", c.value)
+			os.Exit(0)
+		}
+
+		m := w.(*messages.Message)
+		waitGroup := sync.WaitGroup{}
+		acks := 0
+		acksLock := sync.Mutex{}
+		waitGroup.Add(len(c.neighborhood))
+
+		for _, neighbor := range c.neighborhood {
+			go func(adress string) {
+				defer waitGroup.Done()
+
+				conn, err := net.Dial("tcp", adress)
+
+				if err != nil {
+					log.Println("Unable to connect with", adress, "!", err.Error())
+					return
+				}
+
+				defer conn.Close()
+
+				if err := m.Send(conn); err != nil {
+					log.Println("Unable to send message!", err.Error())
+					return
+				}
+
+				time.Sleep(time.Second)
+
+				var response messages.Message
+
+				if err := response.Receive(conn); err != nil {
+					log.Println("Unable to read response!", err.Error())
+					return
+				}
+
+				if response.Action == messages.ACK {
+					acksLock.Lock()
+					acks++
+					acksLock.Unlock()
+				}
+			}(neighbor)
+		}
+
+		waitGroup.Wait()
+
+		if acks == len(c.neighborhood) {
+			c.lock.Lock()
+			switch m.Action {
+			case messages.DEP:
+				log.Printf("Running deposit of %f in timestep %d\n", m.Payload, m.Timestep)
+				c.value += m.Payload
+				c.currentTime++
+			case messages.FEE:
+				log.Printf("Running fees appliance of %f in timestep %d\n", m.Payload, m.Timestep)
+				c.value *= m.Payload
+				c.currentTime++
+			}
+			c.lock.Unlock()
+		} else {
+			c.pipeline.Insert(w)
+		}
+
+		time.Sleep(waitTime)
+	}
+}
+
 func (c *Client) handler() {
 	l, err := net.Listen("tcp", c.neighborhood[c.id-1])
 
@@ -138,12 +214,15 @@ func New(id uint64) *Client {
 		id:          id,
 		currentTime: 1,
 		pipeline:    &minheap.MinHeap[uint64]{},
+		value:       1000,
 	}
 }
 
 func (c *Client) Run() {
 	c.getNeighbors()
 	c.readScript()
+
+	go c.runPipeline()
 
 	c.handler()
 }
