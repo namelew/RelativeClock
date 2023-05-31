@@ -49,3 +49,19 @@ func (m *Message) Send(c net.Conn) error {
 
 	return err
 }
+
+func (m *Message) Receive(c net.Conn) error {
+	buffer := make([]byte, 1024)
+
+	n, err := c.Read(buffer)
+
+	if err != nil {
+		return errors.New("Unable to receive message from " + c.RemoteAddr().String() + ". " + err.Error())
+	}
+
+	if err := m.Unpack(buffer[:n]); err != nil {
+		return errors.New("Unable to read message from " + c.RemoteAddr().String() + ". " + err.Error())
+	}
+
+	return err
+}
