@@ -117,7 +117,7 @@ func (c *Client) handler() {
 			c.lock.Lock()
 			defer c.lock.Unlock()
 
-			if request.Timestep <= c.currentTime {
+			if request.Value() <= c.currentTime {
 				response := messages.Message{
 					Id:       c.id,
 					Action:   messages.ACK,
