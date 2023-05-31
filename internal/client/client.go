@@ -1,124 +1,145 @@
 package client
 
 import (
-	"bufio"
-	"fmt"
 	"log"
 	"net"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
-	"time"
+	"sync"
 
 	"github.com/namelew/RelativeClock/package/messages"
+	"github.com/namelew/RelativeClock/package/minheap"
 )
 
-type Teller struct {
-	id          uint64
-	currentTime uint64
-	server      string
+type Client struct {
+	id           uint64
+	currentTime  uint64
+	pipeline     *minheap.MinHeap[uint64]
+	neighborhood []string
+	lock         sync.Mutex
 }
 
-func New(id uint64) *Teller {
-	return &Teller{
-		id:          id,
-		currentTime: 1,
-		server:      os.Getenv("SERVER"),
+const script string = "./script.in"
+
+func removeBackslashChars(s string) string {
+	var result strings.Builder
+	skip := false
+	for _, r := range s {
+		if skip {
+			skip = false
+			continue
+		}
+		if r == '\\' {
+			skip = true
+			continue
+		}
+		result.WriteRune(r)
+	}
+	return result.String()
+}
+
+func (c *Client) getNeighbors() {
+	c.neighborhood = strings.Split(os.Getenv("NEIGHBORS"), ",")
+}
+
+func (c *Client) readScript() {
+	data, err := os.ReadFile(script)
+
+	if err != nil {
+		log.Fatal("Unable to open script file!", err.Error())
+	}
+
+	lines := strings.Split(string(data), "\n")
+	re := regexp.MustCompile(`(^\d+) (\w) (\d+)$`)
+
+	for i := range lines {
+		line := removeBackslashChars(lines[i])
+
+		match := re.FindStringSubmatch(line)
+
+		if match != nil {
+			tms, err := strconv.ParseInt(match[1], 10, 64)
+
+			if err != nil {
+				log.Fatal("Unable to parser message timestep!", err.Error())
+			}
+
+			act := messages.ERROR
+
+			switch match[2] {
+			case "D":
+				act = messages.DEP
+			case "J":
+				act = messages.FEE
+			}
+
+			value, err := strconv.ParseFloat(match[3], 64)
+
+			if err != nil {
+				log.Fatal("Unable to parser message payload!", err.Error())
+			}
+
+			c.pipeline.Insert(&messages.Message{
+				Id:       c.id,
+				Action:   act,
+				Timestep: uint64(tms),
+				Payload:  value,
+			})
+		}
 	}
 }
 
-func (t *Teller) Run() {
-	r := bufio.NewReader(os.Stdin)
+func New(id uint64) *Client {
+	return &Client{
+		id:          id,
+		currentTime: 1,
+		pipeline:    &minheap.MinHeap[uint64]{},
+	}
+}
 
-	fmt.Printf("Action\n1 - Deposito\n2 - Juros\n")
-	fmt.Println("Expect: Action Value")
+func (c *Client) Run() {
+	c.getNeighbors()
+	c.readScript()
+
+	l, err := net.Listen("tcp", c.neighborhood[c.id-1])
+
+	if err != nil {
+		log.Fatal("Unable to bind port!", err.Error())
+	}
 
 	for {
-		fmt.Print("\nOperation: ")
-		p, err := r.ReadSlice('\n')
+		conn, err := l.Accept()
 
 		if err != nil {
-			log.Println(err.Error())
+			log.Println("Unable to accept connection!", err.Error())
 			continue
 		}
 
-		temp := strings.ReplaceAll(string(p), "\r", "")
-		temp = strings.ReplaceAll(temp, "\n", "")
+		go func(connection net.Conn) {
+			var request messages.Message
 
-		input := strings.Split(temp, " ")
+			if err := request.Receive(connection); err != nil {
+				log.Println("Unable to receive message!", err.Error())
+				return
+			}
 
-		if len(input) < 2 {
-			log.Println("Menos argumentos do que necessário")
-			continue
-		}
+			c.lock.Lock()
+			defer c.lock.Unlock()
 
-		action, err := strconv.Atoi(input[0])
+			if request.Timestep <= c.currentTime {
+				response := messages.Message{
+					Id:       c.id,
+					Action:   messages.ACK,
+					Timestep: c.currentTime,
+				}
 
-		if err != nil {
-			log.Println("Formato inválido! ", err.Error())
-			continue
-		}
-
-		payload, err := strconv.ParseFloat(input[1], 64)
-
-		if err != nil {
-			log.Println("Formato inválido! ", err.Error())
-			continue
-		}
-
-		m := messages.Message{
-			Id:       t.id,
-			Action:   messages.Action(action),
-			Timestep: t.currentTime,
-			Payload:  payload,
-		}
-
-		var server string
-		switch m.Action {
-		case messages.DEP:
-			server = os.Getenv("WAREROUSE")
-		case messages.FEE:
-			server = os.Getenv("FEES")
-		}
-
-		conn, err := net.Dial("tcp", server)
-
-		if err != nil {
-			log.Println("Incapaz de estabelecer conexão com o servidor! ", err.Error())
-			continue
-		}
-
-		if err := m.Send(conn); err != nil {
-			conn.Close()
-			log.Println("Incapaz de enviar requisição ao servidor! ", err.Error())
-			continue
-		}
-
-		time.Sleep(time.Second)
-
-		buffer := make([]byte, 1024)
-
-		n, err := conn.Read(buffer)
-
-		if err != nil {
-			conn.Close()
-			log.Println("Incapaz de receber resposta do servidor! ", err.Error())
-			continue
-		}
-
-		if err := m.Unpack(buffer[:n]); err != nil {
-			conn.Close()
-			log.Println("Incapaz de ler resposta do servidor! ", err.Error())
-			return
-		}
-
-		conn.Close()
-
-		if m.Action != messages.ACK {
-			log.Println("Violação na sequência temporal!")
-			continue
-		}
-
-		t.currentTime++
+				if err := response.Send(connection); err != nil {
+					log.Println("Unable to send response!", err.Error())
+					return
+				}
+			}
+		}(conn)
 	}
 }
